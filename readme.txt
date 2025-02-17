@@ -21,5 +21,3 @@ go run main.go -mode=client -address=localhost:9000
 
 
 
-In your main application (main.go) you would continue to use the client’s Send method and the server’s Broadcast method exactly as before—but now the messages are encoded in binary and sent over UDP.
-This design avoids the overhead and head-of-line blocking of TCP/JSON, and (with appropriate further enhancements such as packet sequencing, client‐side prediction/interpolation, and possibly switching to a more complete UDP reliability layer) can help you achieve a production‐ready online experience.
