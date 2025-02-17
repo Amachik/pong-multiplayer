@@ -7,6 +7,7 @@ import (
 
 	"pong-multiplayer/engine"
 	"pong-multiplayer/network"
+	"pong-multiplayer/shared"
 
 	"github.com/veandco/go-sdl2/sdl"
 	"github.com/veandco/go-sdl2/ttf"
@@ -147,8 +148,8 @@ func (g *Game) Run() {
 }
 
 // GetState returns the current game state.
-func (g *Game) GetState() State {
-	return State{
+func (g *Game) GetState() shared.State {
+	return shared.State{
 		BallX:      g.Ball.X,
 		BallY:      g.Ball.Y,
 		BallVX:     g.Ball.VX,
@@ -178,7 +179,7 @@ func (g *Game) SetState(s State) {
 }
 
 // SetStateSmooth applies a received state smoothly to the game instance.
-func (g *Game) SetStateSmooth(s State) {
+func (g *Game) SetStateSmooth(s shared.State) {
 	// Update ball and local player (Player1) immediately.
 	g.Ball.X = s.BallX
 	g.Ball.Y = s.BallY
@@ -199,7 +200,7 @@ func (g *Game) SetStateSmooth(s State) {
 
 // ApplyRemoteState updates only the remote objects (and score)
 // without altering the local player's paddle.
-func (g *Game) ApplyRemoteState(s State, isClient bool) {
+func (g *Game) ApplyRemoteState(s shared.State, isClient bool) {
 	// Always update the ball and score.
 	g.Ball.X = s.BallX
 	g.Ball.Y = s.BallY
@@ -257,4 +258,23 @@ func (g *Game) RunOverlay(font *ttf.Font) {
 		g.Engine.Present()
 		sdl.Delay(16)
 	}
+}
+
+// renderText renders the given text using SDL_ttf and draws it on the renderer.
+func renderText(renderer *sdl.Renderer, font *ttf.Font, text string, x, y int32) error {
+	color := sdl.Color{R: 255, G: 255, B: 255, A: 255}
+	surface, err := font.RenderUTF8Solid(text, color)
+	if err != nil {
+		return fmt.Errorf("failed to render text surface: %w", err)
+	}
+	defer surface.Free()
+
+	texture, err := renderer.CreateTextureFromSurface(surface)
+	if err != nil {
+		return fmt.Errorf("failed to create text texture: %w", err)
+	}
+	defer texture.Destroy()
+
+	rect := sdl.Rect{X: x, Y: y, W: surface.W, H: surface.H}
+	return renderer.Copy(texture, nil, &rect)
 }

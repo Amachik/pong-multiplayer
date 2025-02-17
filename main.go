@@ -7,13 +7,13 @@ import (
 	"log"
 	"math/rand"
 	"strconv"
-	"sync/atomic"
 	"time"
 	"unsafe"
 
 	"pong-multiplayer/engine"
 	"pong-multiplayer/game"
 	"pong-multiplayer/network"
+	"pong-multiplayer/shared"
 
 	"github.com/veandco/go-sdl2/sdl"
 	"github.com/veandco/go-sdl2/ttf"
@@ -66,7 +66,7 @@ func main() {
 	inviteCode := generateInviteCode()
 
 	// Declare a buffer for received states.
-	var stateBuffer []game.State
+	var stateBuffer []shared.State
 
 	// Main menu loop.
 	for {
@@ -261,16 +261,8 @@ func main() {
 		}()
 
 		// Use a state-update callback to reconcile the host's state with local prediction.
-		client.OnStateUpdate = func(s game.State) {
-			// Append the newly received state.
+		client.OnStateUpdate = func(s shared.State) {
 			stateBuffer = append(stateBuffer, s)
-
-			// Remove very old states (older than 300ms, for example).
-			now := time.Now().UnixNano()
-			delay := int64(300 * 1e6) // 300ms in nanoseconds
-			for len(stateBuffer) >= 2 && stateBuffer[0].Timestamp < now-delay {
-				stateBuffer = stateBuffer[1:]
-			}
 		}
 
 		// Run a combined render and input loop.
@@ -313,15 +305,14 @@ func main() {
 			// Use an adaptive render delay based on measuredRTT (set by your ping/pong routine).
 			adaptiveDelay := defaultRenderDelay
 			if network.MeasuredRTT > 0 {
-				// A more precise value is obtained by reading atomically.
-				adaptiveDelay = atomic.LoadInt64(&network.MeasuredRTT) / 2
+				adaptiveDelay = network.MeasuredRTT / 2
 			}
 
 			if len(stateBuffer) >= 2 {
 				renderTime := time.Now().UnixNano() - adaptiveDelay
 
 				// Find the two states surrounding renderTime.
-				var s1, s2 game.State
+				var s1, s2 shared.State
 				for i := 0; i < len(stateBuffer)-1; i++ {
 					if stateBuffer[i].Timestamp <= renderTime && renderTime <= stateBuffer[i+1].Timestamp {
 						s1 = stateBuffer[i]
@@ -329,33 +320,43 @@ func main() {
 						break
 					}
 				}
+				// Perform interpolation.
 				duration := s2.Timestamp - s1.Timestamp
 				if duration > 0 {
 					t := float32(renderTime-s1.Timestamp) / float32(duration)
-					interpolatedState := game.InterpolateState(s1, s2, t)
-					// For join clients, update remote objects only.
-					g.ApplyRemoteState(interpolatedState, true)
+					interpolatedState := shared.InterpolateState(s1, s2, t)
+					// For client, update only remote objects (ignore Paddle2 which is controlled locally).
+					if selectedMode == "join" {
+						g.ApplyRemoteState(interpolatedState, true)
+					} else {
+						g.SetStateSmooth(interpolatedState)
+					}
 				}
 			}
 
-			// Calculate FPS and retrieve the RTT atomically.
+			// Update FPS calculation.
 			now := time.Now()
 			dt := now.Sub(lastRender)
 			fps := 1.0 / dt.Seconds()
 			lastRender = now
 
-			// Clear, render game, then display overlay text.
+			// Clear screen and render game.
 			eng.Clear()
 			g.Render()
+
+			// Compose overlay text (convert ping from nanoseconds to ms).
 			pingMs := int64(0)
-			rtt := atomic.LoadInt64(&network.MeasuredRTT)
-			if rtt > 0 {
-				pingMs = rtt / 1e6
+			if network.MeasuredRTT > 0 {
+				pingMs = network.MeasuredRTT / 1e6
 			}
 			infoText := fmt.Sprintf("FPS: %.0f  Ping: %d ms", fps, pingMs)
+
+			// Render the overlay text (e.g. at top-left).
 			if err := renderText(eng.Renderer, font, infoText, 10, 10); err != nil {
 				fmt.Println("Error rendering info text:", err)
 			}
+
+			// Present the updated frame.
 			eng.Present()
 			sdl.Delay(16)
 		}

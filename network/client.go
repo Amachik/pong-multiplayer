@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"pong-multiplayer/game"
+	"pong-multiplayer/shared"
 )
 
 var MeasuredRTT int64
@@ -17,7 +17,7 @@ func setMeasuredRTT(rtt int64) {
 	atomic.StoreInt64(&MeasuredRTT, rtt)
 }
 
-type StateUpdateCallback func(state game.State)
+type StateUpdateCallback func(state shared.State)
 
 type Client struct {
 	Address       string
@@ -129,7 +129,7 @@ func (c *Client) listen() {
 			}
 			lastSeq = msg.Seq
 
-			var state game.State
+			var state shared.State
 			reader := bytes.NewReader(msg.Data)
 			var ballX, ballY, ballVX, ballVY, p1X, p1Y, p2X, p2Y float32
 			var scoreLeft, scoreRight int32
@@ -179,7 +179,7 @@ func (c *Client) listen() {
 				fmt.Println("binary read error:", err)
 				continue
 			}
-			state = game.State{
+			state = shared.State{
 				BallX:      ballX,
 				BallY:      ballY,
 				BallVX:     ballVX,
