@@ -1,0 +1,16 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Launch Go App",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/main.go",
+            "env": {
+                "CGO_CFLAGS": "-IC:\\SDL2\\include",
+                "CGO_LDFLAGS": "-LC:\\SDL2\\lib -lSDL2"
+            }
+        }
+    ]
+}
